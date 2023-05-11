@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextcloud-deployment
+spec:
+  selector:
+    matchLabels:
+      app: nextcloud
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: nextcloud
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: nc-persistent-storage
+          mountPath: /var/www/html
+        lifecycle:
+          postStart:
+            exec:
+             command: ["bin/sh", "-c", "mkdir -p /var/www/html"]
+      - name: nextcloud
+        image: nextcloud:fpm
+        ports:
+        - containerPort: 9000
+        volumeMounts:
+        - name: nc-persistent-storage
+          mountPath: /var/www/html
+        resources:
+          limits:
+            cpu: "1"
+      volumes:
+      - name : nginx-config
+        configMap:
+           name: nginx-config
+      - name: nc-persistent-storage
+        persistentVolumeClaim:
+          claimName: nc-pvc
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nextcloud-service
+spec:
+    type: LoadBalancer
+    selector:
+      app: nextcloud
+    ports:
+      - protocol: TCP
+        port: 80
+        targetPort: 80
